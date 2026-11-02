@@ -1,9 +1,8 @@
 class CoopRespawnHelper extends Actor
     config(CoopRespawn);
 
-// Gemeinsame Logik fuer alle PlayerController-Varianten.
-// OnPawnDied() wird aus PawnDied() der Controller aufgerufen (ereignisgesteuert).
-// Danach laeuft ein einmaliger Timer (Respawn-Verzoegerung), kein Polling.
+// Gemeinsame Logik. OnPawnDied() wird nur aus dem abgesicherten PawnDied()
+// des Controllers aufgerufen (laufende Runde, nicht Login).
 
 var config bool  bRespawnEnabled;
 var config float fRespawnDelay;
@@ -16,11 +15,17 @@ static function OnPawnDied(R6PlayerController PC)
     local R6MultiPlayerGameInfo G;
     local CoopRespawnHelper H;
 
-    if (!default.bRespawnEnabled || PC.Level.NetMode == NM_Client || PC.Role != ROLE_Authority)
+    if (!default.bRespawnEnabled)
+        return;
+
+    if (PC == none || PC.Level.NetMode == NM_Client || PC.Role != ROLE_Authority)
         return;
 
     G = R6MultiPlayerGameInfo(PC.Level.Game);
-    if (G == none || G.m_bGameOver)
+    if (G == none || G.m_bGameOver || !G.m_bGameStarted)
+        return;
+
+    if (G.IsInState('InBetweenRoundMenu') || G.IsInState('PostBetweenRoundTime'))
         return;
 
     // Nur Coop-Terroristenjagd
@@ -66,12 +71,13 @@ function Timer()
     G = R6MultiPlayerGameInfo(Level.Game);
 
     if (G != none && m_PC != none && !m_PC.bDeleteMe && !G.m_bGameOver
+        && G.m_bGameStarted
         && !m_PC.IsPlayerPassiveSpectator())
     {
         // Lebt der Spieler wieder (z. B. AI-Backup), nichts tun
         if (m_PC.Pawn == none || !m_PC.Pawn.IsAlive())
         {
-            // R6PlayerController.PawnDied laesst Pawn gesetzt;
+            // PawnDied laesst Pawn oft gesetzt;
             // ResetPlayerTeam startet nur neu, wenn kein R6Pawn zugeordnet ist
             m_PC.Pawn = none;
             G.ResetPlayerTeam(m_PC);
@@ -82,6 +88,7 @@ function Timer()
     }
     else
         log("CoopRespawn: Respawn uebersprungen (Spiel vorbei oder Spieler weg)");
+
     Destroy();
 }
 
