@@ -3,5 +3,7 @@ Start new coop play, if the human partner dies and the other is alive, you respa
 You can change folowing settings:
 
 bRespawnEnabled=True
+
 fRespawnDelay=3.000000
+
 bOnlyIfTeammateAlive=True
